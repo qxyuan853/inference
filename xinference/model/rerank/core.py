@@ -18,6 +18,7 @@ from collections import defaultdict
 from typing import Annotated, Dict, List, Literal, Optional, Tuple, Union
 
 from ..._compat import BaseModel, Field
+from ...constants import XINFERENCE_TRUST_REMOTE_CODE
 from ...types import Rerank
 from ..core import VirtualEnvSettings
 from ..utils import ModelInstanceInfoMixin
@@ -176,7 +177,9 @@ class RerankModel:
     def _get_tokenizer(model_path):
         from transformers import AutoTokenizer
 
-        tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path, trust_remote_code=XINFERENCE_TRUST_REMOTE_CODE
+        )
         return tokenizer
 
     @staticmethod
