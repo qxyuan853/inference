@@ -36,7 +36,7 @@ from ....types import (
     PytorchModelConfig,
 )
 from ...scheduler.request import InferenceRequest
-from ...utils import check_dependency_available, select_device
+from ...utils import allow_trust_remote_code, check_dependency_available, select_device
 from ..core import LLM, chat_context_var
 from ..llm_family import LLMFamilyV2, LLMSpecV1
 from ..utils import (
@@ -120,7 +120,12 @@ class PytorchModel(LLM):
         pytorch_model_config.setdefault("gptq_groupsize", -1)
         pytorch_model_config.setdefault("gptq_act_order", False)
         pytorch_model_config.setdefault("device", "auto")
-        pytorch_model_config.setdefault("trust_remote_code", True)
+        # Built-in models keep their remote-code behavior; custom/generic models
+        # are gated by XINFERENCE_TRUST_REMOTE_CODE and cannot escalate past it.
+        _trc = allow_trust_remote_code(self.model_family)
+        pytorch_model_config["trust_remote_code"] = (
+            bool(pytorch_model_config.get("trust_remote_code", _trc)) and _trc
+        )
         pytorch_model_config.setdefault("max_num_seqs", 16)
         pytorch_model_config.setdefault("enable_tensorizer", False)
         pytorch_model_config.setdefault("reasoning_content", False)
@@ -186,6 +191,7 @@ class PytorchModel(LLM):
     def _get_components(self, **kwargs):
         from transformers import AutoTokenizer
 
+        _trc = allow_trust_remote_code(self.model_family)
         return [
             (
                 "tokenizer",
@@ -193,7 +199,9 @@ class PytorchModel(LLM):
                 AutoTokenizer,
                 {
                     "use_fast": self._use_fast_tokenizer,
-                    "trust_remote_code": kwargs.get("trust_remote_code", True),
+                    "trust_remote_code": (
+                        bool(kwargs.get("trust_remote_code", _trc)) and _trc
+                    ),
                     "revision": kwargs.get("revision"),
                     "code_revision": kwargs.get("code_revision", None),
                 },

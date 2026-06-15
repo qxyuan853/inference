@@ -48,7 +48,7 @@ from ....types import (
     CompletionUsage,
     LoRA,
 )
-from ...utils import check_dependency_available
+from ...utils import allow_trust_remote_code, check_dependency_available
 from ..core import LLM, chat_context_var
 from ..llm_family import LLMFamilyV2, LLMSpecV1
 from ..utils import (
@@ -510,7 +510,12 @@ class MLXModel(LLM, ChatModelMixin):
         if model_config is None:
             model_config = MLXModelConfig()
         model_config.setdefault("revision", self.model_spec.model_revision)
-        model_config.setdefault("trust_remote_code", True)
+        # Built-in models keep their remote-code behavior; custom/generic models
+        # are gated by XINFERENCE_TRUST_REMOTE_CODE and cannot escalate past it.
+        _trc = allow_trust_remote_code(self.model_family)
+        model_config["trust_remote_code"] = (
+            bool(model_config.get("trust_remote_code", _trc)) and _trc
+        )
         model_config.setdefault("reasoning_content", False)
         model_config.setdefault("enable_thinking", False)
         return model_config

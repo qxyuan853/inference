@@ -26,6 +26,7 @@ from ..utils import (
     _collect_virtualenv_engine_markers,
     _extract_engine_markers_from_packages,
     _force_virtualenv_engine_params,
+    allow_trust_remote_code,
     parse_uri,
 )
 
@@ -298,3 +299,25 @@ async def test_cancel():
         with pytest.raises(asyncio.CancelledError):
             await cache_task
         assert downloader.get_progress() == 1.0
+
+
+class _FakeFamily:
+    def __init__(self, is_builtin):
+        self.is_builtin = is_builtin
+
+
+def test_allow_trust_remote_code(monkeypatch):
+    import xinference.constants as constants
+
+    # Operator opt-out (default): only vetted built-in models may run remote code.
+    monkeypatch.setattr(constants, "XINFERENCE_TRUST_REMOTE_CODE", False)
+    assert allow_trust_remote_code(_FakeFamily(True)) is True
+    assert allow_trust_remote_code(_FakeFamily(False)) is False
+    # A user-registered / custom model cannot enable it implicitly, even if it
+    # is routed to a dedicated per-model loader (no is_builtin attr -> False).
+    assert allow_trust_remote_code(object()) is False
+
+    # Operator opt-in: master switch enables remote code for any model.
+    monkeypatch.setattr(constants, "XINFERENCE_TRUST_REMOTE_CODE", True)
+    assert allow_trust_remote_code(_FakeFamily(False)) is True
+    assert allow_trust_remote_code(_FakeFamily(True)) is True

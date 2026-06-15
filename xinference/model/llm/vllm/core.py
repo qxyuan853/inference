@@ -56,6 +56,7 @@ from ....types import (
     CompletionUsage,
     LoRA,
 )
+from ...utils import allow_trust_remote_code
 from .. import BUILTIN_LLM_FAMILIES, LLM, LLMFamilyV2, LLMSpecV1
 from ..core import chat_context_var
 from ..llm_family import cache_model_tokenizer_and_config
@@ -866,7 +867,12 @@ class VLLMModel(LLM):
             model_config.setdefault("tokenizer_mode", "deepseek_v32")
         else:
             model_config.setdefault("tokenizer_mode", "auto")
-        model_config.setdefault("trust_remote_code", True)
+        # Built-in models keep their remote-code behavior; custom/generic models
+        # are gated by XINFERENCE_TRUST_REMOTE_CODE and cannot escalate past it.
+        _trc = allow_trust_remote_code(self.model_family)
+        model_config["trust_remote_code"] = (
+            bool(model_config.get("trust_remote_code", _trc)) and _trc
+        )
         model_config.setdefault("tensor_parallel_size", self._device_count)  # type: ignore
         model_config.setdefault("pipeline_parallel_size", self._n_worker)  # type: ignore
         if (

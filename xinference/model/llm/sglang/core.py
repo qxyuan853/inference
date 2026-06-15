@@ -33,7 +33,7 @@ from ....types import (
     CompletionChunk,
     CompletionUsage,
 )
-from ...utils import check_dependency_available
+from ...utils import allow_trust_remote_code, check_dependency_available
 from .. import LLM, LLMFamilyV2, LLMSpecV1
 from ..core import chat_context_var
 from ..utils import (
@@ -266,7 +266,12 @@ class SGLANGModel(LLM):
 
         cuda_count = self._get_cuda_count()
         model_config.setdefault("tokenizer_mode", "auto")
-        model_config.setdefault("trust_remote_code", True)
+        # Built-in models keep their remote-code behavior; custom/generic models
+        # are gated by XINFERENCE_TRUST_REMOTE_CODE and cannot escalate past it.
+        _trc = allow_trust_remote_code(self.model_family)
+        model_config["trust_remote_code"] = (
+            bool(model_config.get("trust_remote_code", _trc)) and _trc
+        )
         model_config.setdefault("tp_size", cuda_count * self._n_worker)
         # See https://github.com/sgl-project/sglang/blob/00023d622a6d484e67ef4a0e444f708b8fc861c8/python/sglang/srt/server_args.py#L100-L109
         mem_fraction_static = model_config.get("mem_fraction_static")
